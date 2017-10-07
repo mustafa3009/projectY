@@ -1,0 +1,106 @@
+iAWSTemplateFormatVersion: '2010-09-09'
+Description: Voting App Stack with ELB
+Metadata: {}
+Mappings: {}
+Conditions: {}
+Outputs: {}
+Parameters:
+  InstanceType:
+    Description: EC2 instance type
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+      - t1.micro
+      - t2.micro
+      - t2.nano
+    ConstraintDescription: Must be a valid Ec2 instance type
+#  CidrBlock:
+#    AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
+#    Default: 10.0.0.0/16
+#    Description: VPC CIDR Block (eg 10.0.0.0/16)
+#    Type: String
+  KeyName:
+    Description: "Name of existing key pair to enable ssh access to EC2 instances"
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: must be the name of existing Ec2 key pair
+    Default: MusTraining
+  AvailabilityZoneELB1:
+    Description: The AvailabilityZone to use for ELB, NAT/bastion host
+    Type: AWS::EC2::AvailabilityZone::Name
+    Default: us-east-1a
+  AvailabilityZoneELB2:
+    Description: The AvailabilityZone to use for ELB
+    Type: AWS::EC2::AvailabilityZone::Name
+    Default: us-east-1b
+  AvailabilityZoneApp1:
+    Description: The AvailabilityZone to use for the first App server
+    Type: AWS::EC2::AvailabilityZone::Name
+    Default: us-east-1a
+  AvailabilityZoneApp2:
+    Description: The AvailabilityZone to use for the second App server
+    Type: AWS::EC2::AvailabilityZone::Name
+    Default: us-east-1b
+  AvailabilityZoneDB1:
+    Description: The AvailabilityZone to use for the DB server
+    Type: AWS::EC2::AvailabilityZone::Name
+    Default: us-east-1c
+  SubnetCIDRELB1:
+    AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
+    Default: 10.0.0.0/24
+    Description: VPC CIDR Block for NAT/Bastion Subnet (eg 10.0.0.0/24)
+    Type: String
+  SubnetCIDRELB2:
+    AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
+    Default: 10.0.1.0/24
+    Description: VPC CIDR Block for NAT/Bastion Subnet (eg 10.0.1.0/24)
+    Type: String
+  SubnetCIDRApp1:
+    AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
+    Default: 10.0.2.0/24
+    Description: VPC CIDR Block for the App server1 Subnet (eg 10.0.2.0/24)
+    Type: String
+  SubnetCIDRApp2:
+    AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
+    Default: 10.0.3.0/24
+    Description: VPC CIDR Block for the App server2 Subnet (eg 10.0.3.0/24)
+    Type: String
+  SubnetCIDRdb1:
+    AllowedPattern: '((\d{1,3})\.){3}\d{1,3}/\d{1,2}'
+    Default: 10.0.4.0/24
+    Description: VPC CIDR Block for the DB1 Subnet (eg 10.0.4.0/24)
+    Type: String
+
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: vpc-VotingApp
+        - Key: Stack
+          Value: {Ref: 'AWS::StackName'}
+        - Key: Owner
+          Value: rRt7BVS2GFs
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+     Tags:
+        - Key: Name
+          Value: igw-VotingApp
+        - Key: Stack
+          Value: {Ref: 'AWS::StackName'}
+        - Key: Owner
+          Value: rRt7BVS2GFs
+
+  GatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId:
+        Ref: InternetGateway
+      VpcId:
+        Ref: VPC
+
