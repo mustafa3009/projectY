@@ -104,3 +104,80 @@ Resources:
       VpcId:
         Ref: VPC
 
+  PublicSubnetRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+        - Key: Name
+          Value: rt-pub-VotingApp
+        - Key: Stack
+          Value: {Ref: 'AWS::StackName'}
+        - Key: Owner
+          Value: rRt7BVS2GFs
+      VpcId:
+        Ref: VPC
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId:
+        Ref: InternetGateway
+      RouteTableId:
+        Ref: PublicSubnetRouteTable
+
+  PublicSubnet01:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: 
+        Ref: AvailabilityZoneELB1
+      CidrBlock: 
+        Ref: SubnetCIDRELB1 
+      VpcId: 
+        Ref: VPC    
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: subnet01-pub-VotingApp
+        - Key: Description
+          Value: 'Public Subnet for ELB, NAT instance / Bastion host'
+        - Key: Stack
+          Value: {Ref: 'AWS::StackName'}
+        - Key: Owner
+          Value: rRt7BVS2GFs
+  
+  PublicSubnet02:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: 
+        Ref: AvailabilityZoneELB2
+      CidrBlock: 
+        Ref: SubnetCIDRELB2 
+      VpcId: 
+        Ref: VPC    
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: subnet02-pub-VotingApp
+        - Key: Description
+          Value: 'Public Subnet for ELB'
+        - Key: Stack
+          Value: {Ref: 'AWS::StackName'}
+        - Key: Owner
+          Value: rRt7BVS2GFs
+
+  PublicSubnetAssocToPublicRouteTable01:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PublicSubnetRouteTable
+      SubnetId:
+        Ref: PublicSubnet01 
+
+  PublicSubnetAssocToPublicRouteTable02:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PublicSubnetRouteTable
+      SubnetId:
+        Ref: PublicSubnet02 
