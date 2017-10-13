@@ -1,0 +1,129 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Voting App Stack for Docker
+Metadata: {}
+Mappings: {}
+Conditions: {}
+Outputs: {}
+#  AppURL: 
+#    Description: "URL for the voting app"
+#    Value: 
+#      Fn::Join: [ "", [ "http://", !GetAtt AppLoadBalancer.DNSName, ":8099" ] ] 
+
+Parameters:
+  AppCluster:
+    Description: "Name of existing App cluster"
+    Type: String
+#    Type: AWS::ECS::Cluster
+    Default: tw-app
+  AppTaskDesiredCount:
+    Description: "No.of task instances"
+    Type: Number
+    Default: 2
+  ServiceTargetGroupARN:
+    Description: "Target group" 
+    Type: String
+#    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Default: arn:aws:elasticloadbalancing:us-east-1:921261353675:targetgroup/tw-alb-tg/a4db342b443d61d6
+  AppLoadBalancerARN:
+    Description: "App Load balancer"
+    Type: String
+#    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Default: arn:aws:elasticloadbalancing:us-east-1:921261353675:loadbalancer/app/tw-alb/c35bd022a3a91ea0
+  DataCluster:
+    Type: String
+#    Type: AWS::ECS::Cluster
+    Description: "Name of existing Data cluster"
+    Default: tw-data
+
+    
+Resources:
+  Service: 
+    Type: AWS::ECS::Service
+#    DependsOn: ListenerRule
+    Properties: 
+      Cluster: !Ref AppCluster
+      Role: !Ref ServiceRole
+      DesiredCount: !Ref AppTaskDesiredCount
+      TaskDefinition: !Ref ServiceTaskDefinition
+      LoadBalancers: 
+        - ContainerName: "voting-app"
+          ContainerPort: 8099
+          TargetGroupArn: !Ref ServiceTargetGroupARN
+
+  ServiceTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: db-services
+      ContainerDefinitions:
+        - Name: voting-app
+          Essential: true
+          Image: 921261353675.dkr.ecr.us-east-1.amazonaws.com/voter-app:latest
+          Memory: 256
+          PortMappings:
+            - ContainerPort: 8099
+#            LogConfiguration:
+#              LogDriver: awslogs
+#              Options:
+#                  awslogs-group: !Ref AWS::StackName
+#                  awslogs-region: !Ref AWS::Region
+
+#  ServiceTargetGroup:
+#    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+#    Properties:
+#        VpcId: !Ref VPC
+#        Port: 80
+#        Protocol: HTTP
+#        Matcher: 
+#            HttpCode: 200-299
+#        HealthCheckIntervalSeconds: 10
+#        HealthCheckPath: /health
+#        HealthCheckProtocol: HTTP
+#        HealthCheckTimeoutSeconds: 5
+#        HealthyThresholdCount: 2
+        
+  ListenerELB:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn:
+            Ref: ServiceTargetGroupARN
+      LoadBalancerArn:
+        Ref: AppLoadBalancerARN
+      Port: 8099
+      Protocol: HTTP            
+      
+  ServiceRole: 
+    Type: AWS::IAM::Role
+    Properties: 
+      RoleName: !Sub voting-app-ecs-service-${AWS::StackName}
+      Path: /
+      AssumeRolePolicyDocument: |
+          {
+              "Statement": [{
+                  "Effect": "Allow",
+                  "Principal": { "Service": [ "ecs.amazonaws.com" ]},
+                  "Action": [ "sts:AssumeRole" ]
+              }]
+          }
+      Policies: 
+        - PolicyName: !Sub voting-app-ecs-service-${AWS::StackName}
+          PolicyDocument: 
+            {
+                "Version": "2012-10-17",
+                "Statement": [{
+                        "Effect": "Allow",
+                        "Action": [
+                            "ec2:AuthorizeSecurityGroupIngress",
+                            "ec2:Describe*",
+                            "elasticloadbalancing:DeregisterInstancesFromLoadBalancer",
+                            "elasticloadbalancing:Describe*",
+                            "elasticloadbalancing:RegisterInstancesWithLoadBalancer",
+                            "elasticloadbalancing:DeregisterTargets",
+                            "elasticloadbalancing:DescribeTargetGroups",
+                            "elasticloadbalancing:DescribeTargetHealth",
+                            "elasticloadbalancing:RegisterTargets"
+                        ],
+                        "Resource": "*"
+                }]
+            }

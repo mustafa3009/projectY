@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Voting App Stack with ELB
+Description: Voting App Stack for EC2
 Metadata: {}
 Mappings: {}
 Conditions: {}
@@ -461,6 +461,7 @@ Resources:
   AppLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
+      Name: alb-voting-app
       Scheme: internet-facing
       Subnets:
       - Ref: PublicSubnet01
@@ -472,7 +473,7 @@ Resources:
       - Ref: LBSecurityGroup
       Tags:
         - Key: Name
-          Value: elb-App-VotingApp
+          Value: alb-VotinApp
         - Key: Description
           Value: 'Load Balancer for application server'
         - Key: Stack
@@ -491,7 +492,7 @@ Resources:
       HealthCheckPath: /health
 #      Matcher:
 #        HttpCode: '200'
-      Name: ELB-target-group
+      Name: tg-voting-app
       Port: 8099
       Protocol: HTTP
       TargetGroupAttributes:
@@ -501,9 +502,9 @@ Resources:
         Ref: VPC
       Tags:
         - Key: Name
-          Value: elb-App-VotingApp
+          Value: tg-VotingApp
         - Key: Description
-          Value: 'Load Balancer for application server'
+          Value: 'Target group for alb'
         - Key: Stack
           Value: {Ref: 'AWS::StackName'}
         - Key: Owner
@@ -520,3 +521,115 @@ Resources:
         Ref: AppLoadBalancer
       Port: 8099
       Protocol: HTTP         
+      
+########################### DB Environment ############################
+  PrivateSubnetDB01:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: 
+        Ref: AvailabilityZoneDB1
+      CidrBlock: 
+        Ref: SubnetCIDRdb1
+      VpcId: 
+        Ref: VPC
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: subnet01-priv-db-VotingApp
+        - Key: Description
+          Value: 'Private Subnet 2 to host the DB server'
+        - Key: Stack
+          Value: {Ref: 'AWS::StackName'}
+        - Key: Owner
+          Value: rRt7BVS2GFs
+          
+  PrivateSubnetDB1AssocToPrivateRouteTable:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PrivateSubnetRouteTable
+      SubnetId:
+        Ref: PrivateSubnetDB01
+  
+  DBServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: 'App Server firewall'
+      VpcId:
+        Ref: VPC
+      SecurityGroupIngress:
+#        - IpProtocol: tcp
+#          FromPort: '22'
+#          ToPort: '22'
+#          CidrIp: 10.0.0.0/16
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          SourceSecurityGroupId: 
+            Ref: NATnBastionSecurityGroup   
+        - IpProtocol: tcp
+          FromPort: '27017'
+          ToPort: '27017'
+          SourceSecurityGroupId: 
+            Ref: AppServerSecurityGroup   
+      Tags:
+        - Key: Name
+          Value: secgrp-DBServer-VotingApp
+        - Key: Description
+          Value: 'Security group for App Server'
+        - Key: Stack
+          Value: {Ref: 'AWS::StackName'}
+        - Key: Owner
+          Value: rRt7BVS2GFs
+  
+  DBServer01: 
+    Type: AWS::EC2::Instance
+    DependsOn:
+      - NATnBastionHost
+    CreationPolicy:
+      ResourceSignal:
+        Count: '1'
+        Timeout: PT15M
+    Properties: 
+      ImageId: ami-8c1be5f6
+      InstanceType: 
+        Ref: InstanceType
+      KeyName: 
+        Ref: KeyName
+      BlockDeviceMappings: 
+        - DeviceName: "/dev/xvda"
+          Ebs: 
+            VolumeType: "gp2"
+            DeleteOnTermination: 'true'
+            VolumeSize: "8"
+      NetworkInterfaces: 
+      - AssociatePublicIpAddress: 'false'
+        DeviceIndex: '0'
+        GroupSet: 
+          - Ref: DBServerSecurityGroup
+        SubnetId: 
+          Ref: PrivateSubnetDB01
+        PrivateIpAddress: 10.0.4.4
+      SourceDestCheck: 'true'
+      Tags:
+        - Key: Name
+          Value: mongoDB-VotingApp
+        - Key: Stack
+          Value: {Ref: 'AWS::StackName'}
+        - Key: Owner
+          Value: rRt7BVS2GFs
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash -xe
+          echo "Initializing voting app"
+          curl ietf.org
+          yum clean all && yum update -y
+          echo "install mongo and start"
+          printf "[mongodb-org-2.6]\nname=MongoDB 2.6 Repository\nbaseurl=http://downloads-distro.mongodb.org/repo/redhat/os/x86_64\ngpgcheck=0\nenabled=1\n" > /etc/yum.repos.d/mongodb-org-2.6.repo
+          yum install -y mongodb-org
+          sed -i '/bind_ip=127.0.0.1/s/^/#/g' /etc/mongod.conf
+          service mongod start
+          chkconfig mongod on
+          service mongod status
+          /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource DBServer01 --region ${AWS::Region}
+  
