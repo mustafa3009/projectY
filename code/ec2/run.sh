@@ -1,14 +1,26 @@
 #!/bin/bash
-stackname=$1
+set -e
 
-#set -e
+stackname=$1
+cftemplate=$2
+keypairname=$3
+
+
+if [ -z "$stackname" ] || [ -z "$cftemplate" ] || [ -z "$keypairname" ]
+then
+	echo "Not all the required arguments are provided." 
+	echo "Usage: ./run.sh <stack name> <cf template path> <key pair name>"
+	echo "e.g. ./run.sh voting-app /Users/mk/thoughtworks/conf/ec2/cf-voting-app-ec2.template MusTraining"
+	exit 1
+fi
+
 
 echo "Checking for existing $stackname stack........"
-sn=$(aws cloudformation describe-stacks --query="Stacks[].StackName" --output text)
+sn=$(aws cloudformation describe-stacks --query="Stacks[].StackName" --output text || exit 0)
 
-# echo "Stack Name is $sn" 
+#echo "Stack Name is $sn" 
 
-if [ $sn != "" ] && [ $sn == $stackname ]
+if [ ! -z "$sn" ] && [ "$sn" == "$stackname" ]
 then
 	echo "Found $sn"
 	echo "Deleting stack $stackname"
@@ -30,9 +42,10 @@ fi
 
 
 echo "Creating Stack $stackname"
+### Take the template body as a CL argument passing a relative path from the code/ec2 folder
 aws cloudformation create-stack --stack-name $stackname \
---template-body file:////Users/mk/thoughtworks/conf/ec2/cf-voting-app-ec2.template \
---parameters ParameterKey=KeyName,ParameterValue=candidate1 \
+--template-body file://$cftemplate \
+--parameters ParameterKey=KeyName,ParameterValue=$keypairname \
   ParameterKey=InstanceType,ParameterValue=t2.nano 
 #  > cfresponse.json
 
@@ -47,12 +60,13 @@ aws cloudformation wait stack-create-complete --stack-name $stackname
 status=$(aws cloudformation describe-stacks --stack-name $stackname --query="Stacks[].StackStatus" --output text)
 
 echo "Status of stack creation is $status"
-if [ $status != "CREATE_COMPLETE" ]
+if [ "$status" != "CREATE_COMPLETE" ]
 then
 	echo "Stack creation failed for $stackname" 
 	exit 1 	
 fi
 
+#Waiting for extra time to ensure the ALB is operational
 echo "Waiting for the system to warm up......."
 sleep 60s
 
@@ -61,11 +75,7 @@ appURL=$(aws cloudformation describe-stacks --stack-name $stackname --query="Sta
 echo "Application URL for testing is $appURL"
 
 echo "Running smoke tests......"
-python test_smoke.py --baseURL $appURL
+python tests/ec2/test_smoke.py --baseURL $appURL
 
 echo "Running acceptance tests......"
-python test_func.py --baseURL $appURL
-
-
-
-
+python tests/ec2/test_func.py --baseURL $appURL
