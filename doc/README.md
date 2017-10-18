@@ -10,9 +10,9 @@
 
 
 ## Installation
-1. Extract the zip file to a suitable location on a Mac OS or a linux environment (e.g /home/some-user/thoughtworks). 
-This will be the HOME folder 
-2. Use the shell and change directory to the home folder (e.g cd /home/some-user/thoughtworks)
+1. Extract the thoughtworks.tar file to a suitable location on a Mac OS or a linux environment (e.g /home/some-user/thoughtworks). 
+From hereon, this will be referred to as the HOME folder 
+2. Use the shell and change directory to the HOME folder (e.g cd /home/some-user/thoughtworks)
 
 ## Run
 1. Execute the following script using the shell in the HOME folder
